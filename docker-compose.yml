@@ -18,9 +18,9 @@ services:
       - CONNECTOR_PULL_HISTORY=true # If true, the connector will pull the history of the data. But it is not recommended to set it to true as there will a large influx of data.
       - CONNECTOR_HISTORY_START_YEAR=2025 # Data only goes back till 2020
       - CONNECTOR_RUN_EVERY=1h # DEPRECATED, use CONNECTOR_DURATION_PERIOD instead
-      - CONNECTOR_CREATE_THREAT_ACTOR=false
-      - CONNECTOR_CREATE_INTRUSION_SET=false
-      - CONNECTOR_CREATE_REPORT=false
+      - CONNECTOR_CREATE_THREAT_ACTOR=true
+      - CONNECTOR_CREATE_INTRUSION_SET=true
+      - CONNECTOR_CREATE_REPORT=true
       - CONNECTOR_CREATE_CAMPAIGN=true
 
     restart: always

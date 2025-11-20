@@ -378,7 +378,7 @@ class ConverterToStix:
    
     def process_campaign(
         self,
-        campaign_name: str,
+        actor_name: str,
         group_data: dict,
         victim: stix2.Identity,
         attack_date_iso: datetime = None,
@@ -390,7 +390,7 @@ class ConverterToStix:
         Process campaign to stix2 and create stix2 relationship linked
 
         Params:
-            campaign_name (str): name of the campaign
+            actor_name (str): Name of the ransomware group (Intrusion Set) attributed to the campaign.
             group_data (dict): result from ransomware api /group
             victim (Identity): stix2 Identity object of victim
             attack_date_iso (datetime): attack date in datetime
@@ -400,10 +400,16 @@ class ConverterToStix:
             campaign: stix2 Campaign object
             target_relation: stix2 Relationship between campaign and victim
         """
-        campaign_description = description or f"Ransomware campaign attributed to {campaign_name}. Description: {group_data[0].get('description', '')}"
+
+        if victim and victim.get('name'):
+            name = f"{actor_name} targets {victim.get('name')}"
+        else:
+            name = f"Ransomware Campaign by {actor_name}" + (f" ({attack_date_iso.date()})" if attack_date_iso else "")
+
+        description = description or f"Ransomware campaign attributed to {actor_name}. Description: {group_data[0].get('description', '')}"
 
         campaign = self.create_campaign(
-            name=f"Campaign of {campaign_name} targeting {victim.get('name')}",
+            name=name,
             description=description,
             first_seen=attack_date_iso,
             external_references=external_references,

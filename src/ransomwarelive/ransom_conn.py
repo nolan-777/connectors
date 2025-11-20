@@ -161,7 +161,7 @@ class RansomwareAPIConnector:
         campaign = None
         if self.config.connector.create_campaign : 
             campaign, target_relation = self.converter_to_stix.process_campaign(
-                campaign_name=item.get("campaign_name", item.get("group")),
+                actor_name=item.get("group"),
                 group_data=group_data,
                 victim=victim,
                 description=item.get("description"),
