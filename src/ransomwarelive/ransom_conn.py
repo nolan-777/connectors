@@ -24,7 +24,8 @@ class RansomwareAPIConnector:
         self.helper = helper
         self.config = config
         self.work_id = None
-        self.converter_to_stix = ConverterToStix()
+        marking_value = self.config["MARKING_VALUE"]
+        self.converter_to_stix = ConverterToStix(marking_value)
         self.marking = self.converter_to_stix.marking
         self.last_run = None
         self.last_run_datetime_with_ingested_data = None
@@ -382,32 +383,32 @@ def collect_historic_intelligence(self):
 
     history_start_year = str(self.config.connector.history_start_year).strip()
 
-    start_year = 2020
-    start_month = 1
+    start_year_historic = 2020
+    start_month_historic = 1
 
     # Extract year/month from string
     if history_start_year.isdigit():
         if len(history_start_year) >= 6:
             # "YYYYMM": first 4 = year, last 2 = month
-            start_year = int(history_start_year[:4])
-            start_month = int(history_start_year[-2:])
+            start_year_historic = int(history_start_year[:4])
+            start_month_historic = int(history_start_year[-2:])
         elif len(history_start_year) == 4:
             # "YYYY": only year, start from January
-            start_year = int(history_start_year)
-            start_month = 1
+            start_year_historic = int(history_start_year)
+            start_month_historic = 1
     else:
         self.helper.connector_logger.warning(
             f"Invalid history_start_year '{history_start_year}', defaulting to 2020-01"
         )
 
     # Clamp year/month to valid ranges
-    if start_year < 2020:
-        start_year = 2020
-    if not (1 <= start_month <= 12):
+    if start_year_historic < 2020:
+        start_year_historic = 2020
+    if not (1 <= start_month_historic <= 12):
         self.helper.connector_logger.warning(
             f"Invalid start month parsed from history_start_year '{history_start_year}', defaulting to 1"
         )
-        start_month = 1
+        start_month_historic = 1
 
     # Upper bounds: do not query in the future
     now = datetime.now()
@@ -415,22 +416,22 @@ def collect_historic_intelligence(self):
     current_month = now.month
 
     # If start year is in the future, stop early
-    if start_year > current_year:
+    if start_year_historic > current_year:
         self.helper.connector_logger.info(
-            f"No historic collection: start_year '{start_year}' > current_year '{current_year}'."
+            f"No historic collection: start_year_historic '{start_year_historic}' > current_year '{current_year}'."
         )
         return
 
     nb_stix_objects = 0
 
     # Iterate years and months:
-    # - First year: start at start_month
+    # - First year: start at start_month_historic
     # - Next years: start at January
     # - Current year: stop at current_month
-    for year in range(start_year, current_year + 1):   # Looping through the years
+    for year in range(start_year_historic, current_year + 1):   # Looping through the years
         year_url = "victims/" + str(year)
 
-        first_month = start_month if year == start_year else 1
+        first_month = start_month_historic if year == start_year_historic else 1
         last_month = current_month if year == current_year else 12
 
         for month in range(first_month, last_month + 1):

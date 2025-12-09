@@ -14,8 +14,6 @@ from pycti import (
 )
 from ransomwarelive.utils import threat_description_generator
 
-marking_value = os.getenv("MARKING_VALUE", "TLP:CLEAR")
-
 class ConverterToStix:
     """
     Provides methods for converting various types of input data into STIX 2.1 objects.
@@ -24,7 +22,7 @@ class ConverterToStix:
     - generate_id() for each entity from OpenCTI pycti library except observables to create
     """
 
-    def __init__(self):
+    def __init__(self, marking_value: str):
         self.marking = self.load_marking_definition(marking_value)
         self.author = self.create_author()
 
