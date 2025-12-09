@@ -371,67 +371,116 @@ class RansomwareAPIConnector:
 
         return bundle_objects
 
-    def collect_historic_intelligence(self):
-        """Collects historic intelligence from ransomware.live"""
-        group_data = self.api_client.get_feed("groups")
-        year = (
-            self.config.connector.history_start_year
-            if self.config.connector.history_start_year >= 2020
-            else 2020
+
+from datetime import datetime, timezone
+import stix2
+
+def collect_historic_intelligence(self):
+    """Collects historic intelligence from ransomware.live"""
+    # fetching group information
+    group_data = self.api_client.get_feed("groups")
+
+    history_start_year = str(self.config.connector.history_start_year).strip()
+
+    start_year = 2020
+    start_month = 1
+
+    # Extract year/month from string
+    if history_start_year.isdigit():
+        if len(history_start_year) >= 6:
+            # "YYYYMM": first 4 = year, last 2 = month
+            start_year = int(history_start_year[:4])
+            start_month = int(history_start_year[-2:])
+        elif len(history_start_year) == 4:
+            # "YYYY": only year, start from January
+            start_year = int(history_start_year)
+            start_month = 1
+    else:
+        self.helper.connector_logger.warning(
+            f"Invalid history_start_year '{history_start_year}', defaulting to 2020-01"
         )
 
-        current_year = datetime.now().year
-        nb_stix_objects = 0
+    # Clamp year/month to valid ranges
+    if start_year < 2020:
+        start_year = 2020
+    if not (1 <= start_month <= 12):
+        self.helper.connector_logger.warning(
+            f"Invalid start month parsed from history_start_year '{history_start_year}', defaulting to 1"
+        )
+        start_month = 1
 
-        for year in range(year, current_year + 1):
-            year_url = "victims/" + str(year)
-            for month in range(1, 13):
-                bundles = []
-                path = year_url + "/" + str(month)
-                response_json = self.api_client.get_feed(path)
+    # Upper bounds: do not query in the future
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
 
-                for item in response_json:
-                    try:
-                        bundle_list = self.create_bundle_list(
-                            item=item, group_data=group_data
-                        )
+    # If start year is in the future, stop early
+    if start_year > current_year:
+        self.helper.connector_logger.info(
+            f"No historic collection: start_year '{start_year}' > current_year '{current_year}'."
+        )
+        return
 
-                        if bundle_list:
-                            bundle_list = [self.converter_to_stix.author] + bundle_list
-                            nb_stix_objects += len(bundle_list)
-                            bundle_list = self.helper.stix2_deduplicate_objects(
-                                bundle_list
-                            )
-                            bundles.append(self.helper.stix2_create_bundle(bundle_list))
-                        else:
-                            self.helper.connector_logger.info("No new data to process")
-                    except stix2.exceptions.STIXError as error:
-                        self.helper.connector_logger.error(
-                            "Error during creation of bundle on collect historic intelligence",
-                            {"error": error},
-                        )
-                        continue
+    nb_stix_objects = 0
 
-                if bundles:
-                    friendly_name = f"RansomwareLive - {year}/{month}"
-                    self.work_id = self.helper.api.work.initiate_work(
-                        self.helper.connect_id, friendly_name
+    # Iterate years and months:
+    # - First year: start at start_month
+    # - Next years: start at January
+    # - Current year: stop at current_month
+    for year in range(start_year, current_year + 1):   # Looping through the years
+        year_url = "victims/" + str(year)
+
+        first_month = start_month if year == start_year else 1
+        last_month = current_month if year == current_year else 12
+
+        for month in range(first_month, last_month + 1):
+            bundles = []
+            path = year_url + "/" + str(month)
+            response_json = self.api_client.get_feed(path)
+
+            for item in response_json:
+                try:
+                    bundle_list = self.create_bundle_list(item=item, group_data=group_data)
+
+                    if bundle_list:
+                        # Add author, deduplicate, and bundle
+                        bundle_list = [self.converter_to_stix.author] + bundle_list
+                        nb_stix_objects += len(bundle_list)
+                        # Deduplicate the objects
+                        bundle_list = self.helper.stix2_deduplicate_objects(bundle_list)
+                        bundles.append(self.helper.stix2_create_bundle(bundle_list))
+                    else:
+                        self.helper.connector_logger.info("No new data to process")
+                except stix2.exceptions.STIXError as error:
+                    self.helper.connector_logger.error(
+                        "Error during creation of bundle on collect historic intelligence",
+                        {"error": error},
                     )
-                    for bundle in bundles:
-                        self.helper.send_stix2_bundle(
-                            bundle=bundle,
-                            work_id=self.work_id,
-                            cleanup_inconsistent_bundle=True,
-                        )
-                    self.helper.connector_logger.info(
-                        "Sending STIX objects to OpenCTI...",
-                        {"len_bundle_list": len(bundle_list)},
-                    )
+                    continue
 
-        if nb_stix_objects:
-            self.last_run_datetime_with_ingested_data = datetime.now(
-                tz=timezone.utc
-            ).isoformat(timespec="seconds")
+            # Send bundles for this year/month
+            if bundles:
+                # Initiate new work
+                friendly_name = f"RansomwareLive - {year}/{month:02d}"
+                self.work_id = self.helper.api.work.initiate_work(
+                    self.helper.connect_id, friendly_name
+                )
+                for bundle in bundles:
+                    self.helper.send_stix2_bundle(
+                        bundle=bundle,
+                        work_id=self.work_id,
+                        cleanup_inconsistent_bundle=True,
+                    )
+                self.helper.connector_logger.info(
+                    "Sending STIX objects to OpenCTI...",
+                    {"count_bundles": len(bundles)},
+                )
+
+    # Record last run time when data was ingested
+    if nb_stix_objects:
+        self.last_run_datetime_with_ingested_data = datetime.now(
+            tz=timezone.utc
+        ).isoformat(timespec="seconds")
 
     def collect_intelligence(self):
         """Collects intelligence from the last 24 on ransomware.live"""
