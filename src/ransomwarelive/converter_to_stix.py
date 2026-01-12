@@ -1,18 +1,19 @@
 import datetime
-import os
+
 import stix2
 from pycti import (
+    Campaign,
     Identity,
     IntrusionSet,
     Location,
+    MarkingDefinition,
     Report,
     StixCoreRelationship,
     ThreatActorGroup,
-    Campaign,
-    MarkingDefinition,
-    OpenCTIConnectorHelper
 )
+
 from ransomwarelive.utils import threat_description_generator
+
 
 class ConverterToStix:
     """
@@ -26,7 +27,6 @@ class ConverterToStix:
         self.marking = self.load_marking_definition(marking_value)
         self.author = self.create_author()
 
-    
     def load_marking_definition(self, marking_value: str):
         TLP_MAPPING = {
             "TLP:CLEAR": stix2.TLP_WHITE,
@@ -43,7 +43,6 @@ class ConverterToStix:
             ),
         }
         return TLP_MAPPING.get(marking_value, TLP_MAPPING["TLP:CLEAR"])
-
 
     def create_author(self) -> dict:
         """
@@ -120,7 +119,7 @@ class ConverterToStix:
             object_marking_refs=[self.marking.id] if self.marking else [],
         )
         return identity
-    
+
     def create_ipv4(self, ip: str):
         """
         Create STIX 2.1 IPv4 Address object
@@ -137,7 +136,7 @@ class ConverterToStix:
             created_by_ref=self.author.get("id"),
             allow_custom=True,
         )
-    
+
     def create_ipv6(self, ip: str):
         """
         Create STIX 2.1 IPv6 Address object
@@ -156,12 +155,12 @@ class ConverterToStix:
         )
 
     def create_campaign(
-            self, 
-            name: str, 
-            description: str = None, 
-            first_seen: datetime = None, 
-            external_references: list = None
-    ): 
+        self,
+        name: str,
+        description: str = None,
+        first_seen: datetime = None,
+        external_references: list = None,
+    ):
         """
         Create STIX 2.1 Campaign object
 
@@ -181,7 +180,7 @@ class ConverterToStix:
             first_seen=first_seen,
             created_by_ref=self.author.get("id"),
             object_marking_refs=[self.marking.id] if self.marking else [],
-            external_references=external_references
+            external_references=external_references,
         )
         return campaign
 
@@ -201,7 +200,7 @@ class ConverterToStix:
             IntrusionSet in STIX 2.1 format
         """
         if len(name.strip()) < 2:
-                name = name + " "
+            name = name + " "
         intrusionset = stix2.IntrusionSet(
             id=IntrusionSet.generate_id(name),
             name=name,
@@ -434,7 +433,7 @@ class ConverterToStix:
             created=discovered_iso,
         )
         return intrusion_set, relation_victim_intrusion
-   
+
     def process_campaign(
         self,
         actor_name: str,
@@ -453,7 +452,7 @@ class ConverterToStix:
             group_data (dict): result from ransomware api /group
             victim (Identity): stix2 Identity object of victim
             attack_date_iso (datetime): attack date in datetime
-            discovered_iso (datetime): discovered datetime          
+            discovered_iso (datetime): discovered datetime
             description (str, optional): Custom description for the campaign. If not provided, a default description will be generated.
             external_references (list, optional): List of external references (stix2 ExternalReference objects) related to the campaign.
 
@@ -461,15 +460,18 @@ class ConverterToStix:
             campaign: stix2 Campaign object
             target_relation: stix2 Relationship between campaign and victim
         """
-        
-        actor_name = actor_name.strip() if actor_name else 'Unknown'
 
-        if victim and victim.get('name'):
+        actor_name = actor_name.strip() if actor_name else "Unknown"
+
+        if victim and victim.get("name"):
             name = f"{actor_name} targets {victim.get('name')}"
         else:
             name = f"Ransomware Campaign by {actor_name}"
 
-        description = description or f"Ransomware campaign attributed to {actor_name}. Description: {group_data[0].get('description', '')}"
+        description = (
+            description
+            or f"Ransomware campaign attributed to {actor_name}. Description: {group_data[0].get('description', '')}"
+        )
 
         campaign = self.create_campaign(
             name=name,
@@ -521,7 +523,7 @@ class ConverterToStix:
             target_ref=location.get("id"),
             relationship_type="located-at",
         )
-       
+
         relation_intrusion_location = None
         if create_intrusion_set and intrusion_set:
             relation_intrusion_location = self.create_relationship(
@@ -630,7 +632,7 @@ class ConverterToStix:
                 start_time=attack_date_iso,
                 created=discovered_iso,
             )
-       
+
         relation_intrusion_sector = None
         if create_intrusion_set and intrusion_set:
             relation_intrusion_sector = self.create_relationship(
@@ -640,7 +642,7 @@ class ConverterToStix:
                 attack_date_iso,
                 discovered_iso,
             )
-        
+
         relation_campaign_sector = None
         if create_campaign and campaign:
             relation_campaign_sector = self.create_relationship(

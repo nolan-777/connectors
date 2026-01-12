@@ -3,8 +3,9 @@ from datetime import datetime, timedelta, timezone
 
 import pycti
 import stix2
-from models.configs.config_loader import ConfigLoader
 from pycti import OpenCTIConnectorHelper
+
+from models.configs.config_loader import ConfigLoader
 from ransomwarelive.api_client import RansomwareAPIClient, RansomwareAPIError
 from ransomwarelive.converter_to_stix import ConverterToStix
 from ransomwarelive.utils import domain_extractor, is_domain, safe_datetime
@@ -85,13 +86,19 @@ class RansomwareAPIConnector:
             sector_out = self.helper.api.identity.read(
                 filters={
                     "mode": "and",
-                    "filters": [{"key": "entity_type", "values": ["Sector"], "operator": "eq"}],
+                    "filters": [
+                        {"key": "entity_type", "values": ["Sector"], "operator": "eq"}
+                    ],
                     "filterGroups": [
                         {
                             "mode": "or",
                             "filters": [
                                 {"key": "name", "values": sector, "operator": "eq"},
-                                {"key": "x_opencti_aliases", "values": sector, "operator": "eq"},
+                                {
+                                    "key": "x_opencti_aliases",
+                                    "values": sector,
+                                    "operator": "eq",
+                                },
                             ],
                             "filterGroups": [],
                         }
@@ -157,23 +164,23 @@ class RansomwareAPIConnector:
             )
             bundle_objects.append(threat_actor)
             bundle_objects.append(target_relation)
-        
+
         # 3. Creating Campaign object
         campaign = None
-        if self.config.connector.create_campaign : 
+        if self.config.connector.create_campaign:
             campaign, target_relation = self.converter_to_stix.process_campaign(
                 actor_name=item.get("group"),
                 group_data=group_data,
                 victim=victim,
                 description=item.get("description"),
-                attack_date_iso=attack_date_iso, #first_seen
+                attack_date_iso=attack_date_iso,  # first_seen
                 external_references=external_references,
             )
             bundle_objects.append(campaign)
-        
+
             # Relation entre la campagne et la victime
             relation_campaign_victim = self.converter_to_stix.create_relationship(
-            campaign.id, victim.get("id"), "targets"
+                campaign.id, victim.get("id"), "targets"
             )
             if relation_campaign_victim:
                 bundle_objects.append(relation_campaign_victim)
@@ -200,17 +207,27 @@ class RansomwareAPIConnector:
                 bundle_objects.append(relation_victim_intrusion)
 
             # Link Intrusion Set <-> Threat Actor
-            if self.config.connector.create_threat_actor and self.config.connector.create_intrusion_set:
-                relation_intrusion_threat_actor = (self.converter_to_stix.create_relationship(
-                    intrusion_set.id, threat_actor.id, "attributed-to")
+            if (
+                self.config.connector.create_threat_actor
+                and self.config.connector.create_intrusion_set
+            ):
+                relation_intrusion_threat_actor = (
+                    self.converter_to_stix.create_relationship(
+                        intrusion_set.id, threat_actor.id, "attributed-to"
+                    )
                 )
                 bundle_objects.append(relation_intrusion_threat_actor)
-            
+
             # Link Campaign -> Intrusion Set
-            if  self.config.connector.create_campaign and self.config.connector.create_intrusion_set:
-                relation_campaign_intrusion = self.converter_to_stix.create_relationship(
-                campaign.id, intrusion_set.id, "attributed-to"
-                )  
+            if (
+                self.config.connector.create_campaign
+                and self.config.connector.create_intrusion_set
+            ):
+                relation_campaign_intrusion = (
+                    self.converter_to_stix.create_relationship(
+                        campaign.id, intrusion_set.id, "attributed-to"
+                    )
+                )
                 if relation_campaign_intrusion:
                     bundle_objects.append(relation_campaign_intrusion)
 
@@ -222,13 +239,20 @@ class RansomwareAPIConnector:
         object_refs = []
         if self.config.connector.create_report:
             object_refs.append(victim.get("id"))
-           
+
             if self.config.connector.create_intrusion_set:
                 object_refs.append(intrusion_set.id)
                 object_refs.append(relation_victim_intrusion.id)
-            if self.config.connector.create_threat_actor and target_relation and threat_actor:
+            if (
+                self.config.connector.create_threat_actor
+                and target_relation
+                and threat_actor
+            ):
                 object_refs.append(target_relation.get("id"))
-            if self.config.connector.create_threat_actor and self.config.connector.create_intrusion_set:
+            if (
+                self.config.connector.create_threat_actor
+                and self.config.connector.create_intrusion_set
+            ):
                 object_refs.append(relation_intrusion_threat_actor.get("id"))
 
             report = self.converter_to_stix.process_report(
@@ -244,8 +268,13 @@ class RansomwareAPIConnector:
                 if self.config.connector.create_campaign:
                     report.get("object_refs").append(campaign.get("id"))
                     report.get("object_refs").append(relation_campaign_victim.get("id"))
-                if self.config.connector.create_campaign and self.config.connector.create_intrusion_set:
-                    report.get("object_refs").append(relation_campaign_intrusion.get("id"))
+                if (
+                    self.config.connector.create_campaign
+                    and self.config.connector.create_intrusion_set
+                ):
+                    report.get("object_refs").append(
+                        relation_campaign_intrusion.get("id")
+                    )
                 bundle_objects.append(report)
 
         # 6. Creating Sector object
@@ -276,8 +305,8 @@ class RansomwareAPIConnector:
                     bundle_objects.append(relation_sector_threat_actor)
                     if self.config.connector.create_report:
                         report.get("object_refs").append(
-                        relation_sector_threat_actor.get("id")
-                    )
+                            relation_sector_threat_actor.get("id")
+                        )
                 if self.config.connector.create_intrusion_set:
                     bundle_objects.append(relation_intrusion_sector)
 
@@ -288,11 +317,17 @@ class RansomwareAPIConnector:
                     report.get("object_refs").append(sector.get("id"))
                     report.get("object_refs").append(relation_sector_victim.get("id"))
                     if relation_sector_threat_actor:
-                        report.get("object_refs").append(relation_sector_threat_actor.get("id"))
+                        report.get("object_refs").append(
+                            relation_sector_threat_actor.get("id")
+                        )
                     if relation_intrusion_sector:
-                        report.get("object_refs").append(relation_intrusion_sector.get("id"))
+                        report.get("object_refs").append(
+                            relation_intrusion_sector.get("id")
+                        )
                     if relation_campaign_sector:
-                        report.get("object_refs").append(relation_campaign_sector.get("id"))
+                        report.get("object_refs").append(
+                            relation_campaign_sector.get("id")
+                        )
 
         # 7. Creating Domain object
         domain_name = None
@@ -342,19 +377,23 @@ class RansomwareAPIConnector:
 
                 bundle_objects.append(location)
                 bundle_objects.append(location_relation)
-               
-                if relation_intrusion_location: 
+
+                if relation_intrusion_location:
                     bundle_objects.append(relation_intrusion_location)
 
                 if self.config.connector.create_threat_actor:
                     bundle_objects.append(relation_threat_actor_location)
 
-                if self.config.connector.create_report and report: 
+                if self.config.connector.create_report and report:
                     if relation_threat_actor_location:
-                        report.get("object_refs").append(relation_threat_actor_location.get("id"))
+                        report.get("object_refs").append(
+                            relation_threat_actor_location.get("id")
+                        )
                     report.get("object_refs").append(location.get("id"))
                     if relation_intrusion_location:
-                        report.get("object_refs").append(relation_intrusion_location.get("id"))
+                        report.get("object_refs").append(
+                            relation_intrusion_location.get("id")
+                        )
                     report.get("object_refs").append(location_relation.get("id"))
 
                     if report:
@@ -368,13 +407,18 @@ class RansomwareAPIConnector:
             "Sending STIX objects to collect_intelligence.",
             {"len_bundle_objects": len(bundle_objects)},
         )
-        bundle_objects = [self.converter_to_stix.marking, self.converter_to_stix.author] + bundle_objects
+        bundle_objects = [
+            self.converter_to_stix.marking,
+            self.converter_to_stix.author,
+        ] + bundle_objects
 
         return bundle_objects
 
 
 from datetime import datetime, timezone
+
 import stix2
+
 
 def collect_historic_intelligence(self):
     """Collects historic intelligence from ransomware.live"""
@@ -428,7 +472,9 @@ def collect_historic_intelligence(self):
     # - First year: start at start_month_historic
     # - Next years: start at January
     # - Current year: stop at current_month
-    for year in range(start_year_historic, current_year + 1):   # Looping through the years
+    for year in range(
+        start_year_historic, current_year + 1
+    ):  # Looping through the years
         year_url = "victims/" + str(year)
 
         first_month = start_month_historic if year == start_year_historic else 1
@@ -441,7 +487,9 @@ def collect_historic_intelligence(self):
 
             for item in response_json:
                 try:
-                    bundle_list = self.create_bundle_list(item=item, group_data=group_data)
+                    bundle_list = self.create_bundle_list(
+                        item=item, group_data=group_data
+                    )
 
                     if bundle_list:
                         # Add author, deduplicate, and bundle
@@ -500,9 +548,7 @@ def collect_historic_intelligence(self):
             if not last_run_datetime:
                 time_diff = 0
             else:
-                time_diff = (
-                    created - (last_run_datetime - timedelta(days=1))
-                ).seconds
+                time_diff = (created - (last_run_datetime - timedelta(days=1))).seconds
 
             if time_diff < ONE_DAY_IN_SECONDS:
                 try:
@@ -513,7 +559,10 @@ def collect_historic_intelligence(self):
 
                     if bundle_list:
                         # Add Author object and marking
-                        bundle_list = [self.converter_to_stix.marking, self.converter_to_stix.author] + bundle_list
+                        bundle_list = [
+                            self.converter_to_stix.marking,
+                            self.converter_to_stix.author,
+                        ] + bundle_list
                         bundle_list = self.helper.stix2_deduplicate_objects(bundle_list)
                         nb_stix_objects += len(bundle_list)
 
