@@ -415,11 +415,6 @@ class RansomwareAPIConnector:
         return bundle_objects
 
 
-from datetime import datetime, timezone
-
-import stix2
-
-
 def collect_historic_intelligence(self):
     """Collects historic intelligence from ransomware.live"""
     # fetching group information

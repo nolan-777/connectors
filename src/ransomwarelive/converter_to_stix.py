@@ -1,16 +1,9 @@
 import datetime
 
 import stix2
-from pycti import (
-    Campaign,
-    Identity,
-    IntrusionSet,
-    Location,
-    MarkingDefinition,
-    Report,
-    StixCoreRelationship,
-    ThreatActorGroup,
-)
+from pycti import (Campaign, Identity, IntrusionSet, Location,
+                   MarkingDefinition, Report, StixCoreRelationship,
+                   ThreatActorGroup)
 
 from ransomwarelive.utils import threat_description_generator
 

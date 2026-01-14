@@ -2,7 +2,8 @@ from datetime import timedelta
 from typing import Annotated, Literal
 
 from connectors_sdk.core.pydantic import ListFromString
-from pydantic import Field, HttpUrl, PlainSerializer, PositiveInt, field_validator
+from pydantic import (Field, HttpUrl, PlainSerializer, PositiveInt,
+                      field_validator)
 
 from models.configs import ConfigBaseSettings
 
